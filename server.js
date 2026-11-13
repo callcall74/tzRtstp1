@@ -23,11 +23,31 @@ const FFMPEG = resolveFfmpeg();
 
 // ---------- 설정 (로그인 비밀번호) ----------
 // config.json이 없으면 비밀번호와 세션 키를 생성해 저장. ADMIN_PASSWORD 환경 변수가 우선.
+// 파일을 저장하면 서버 재시작 없이 자동 적용됨.
+function readConfigFile() {
+  // 메모장 등이 붙이는 BOM 제거
+  return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8').replace(/^﻿/, ''));
+}
+
+function parseViewLimit(cfg) {
+  // "60"처럼 문자열로 넣어도 숫자로 인식
+  const n = Number(cfg.viewLimitSec);
+  return cfg.viewLimitSec !== undefined && cfg.viewLimitSec !== '' && Number.isFinite(n) && n >= 0
+    ? n
+    : 30;
+}
+
 function loadConfig() {
   let cfg = {};
-  try {
-    cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-  } catch {}
+  if (fs.existsSync(CONFIG_FILE)) {
+    try {
+      cfg = readConfigFile();
+    } catch (err) {
+      // 형식이 깨진 파일을 덮어쓰지 않도록 시작을 중단
+      console.error(`config.json 형식 오류: ${err.message}`);
+      process.exit(1);
+    }
+  }
   let changed = false;
   if (!cfg.password) {
     cfg.password = crypto.randomBytes(6).toString('base64url');
@@ -42,15 +62,35 @@ function loadConfig() {
   if (process.env.ADMIN_PASSWORD) cfg.password = process.env.ADMIN_PASSWORD;
   return cfg;
 }
-const config = loadConfig();
+let config = loadConfig();
 // 한 번 연결로 볼 수 있는 시간 (네트워크 사용량 절약). config.json의 viewLimitSec로 변경, 0이면 무제한
-// "60"처럼 문자열로 넣어도 숫자로 인식
-const VIEW_LIMIT_SEC = (() => {
-  const n = Number(config.viewLimitSec);
-  return config.viewLimitSec !== undefined && config.viewLimitSec !== '' && Number.isFinite(n) && n >= 0
-    ? n
-    : 30;
-})();
+let viewLimitSec = parseViewLimit(config);
+
+function describeLimit(sec) {
+  return sec > 0 ? `${sec}초` : '없음';
+}
+
+// config.json 변경 감지 → 다시 읽어서 적용 (형식이 틀리면 기존 설정 유지)
+fs.watchFile(CONFIG_FILE, { interval: 1000 }, (curr, prev) => {
+  if (curr.mtimeMs === prev.mtimeMs) return;
+  let cfg;
+  try {
+    cfg = readConfigFile();
+  } catch (err) {
+    console.error(`config.json 형식 오류 — 기존 설정 유지: ${err.message}`);
+    return;
+  }
+  const next = {
+    ...cfg,
+    password: process.env.ADMIN_PASSWORD || cfg.password || config.password,
+    sessionSecret: cfg.sessionSecret || config.sessionSecret,
+  };
+  if (next.password !== config.password) console.log('로그인 비밀번호 변경 적용 (기존 로그인은 해제됨)');
+  const nextLimit = parseViewLimit(next);
+  if (nextLimit !== viewLimitSec) console.log(`시청 시간 제한 변경: ${describeLimit(nextLimit)}`);
+  config = next;
+  viewLimitSec = nextLimit;
+});
 
 // ---------- 카메라 목록 ----------
 function loadCameras() {
@@ -324,7 +364,7 @@ function publicCamera(cam) {
 }
 
 app.get('/api/settings', (req, res) => {
-  res.json({ viewLimitSec: VIEW_LIMIT_SEC });
+  res.json({ viewLimitSec });
 });
 
 app.get('/api/cameras', (req, res) => {
@@ -373,8 +413,9 @@ app.get('/stream/:id', (req, res) => {
   const s = getStream(cam);
   s.addClient(res);
   // 제한 시간이 지나면 서버에서 연결을 끊음 (클라이언트가 무시해도 전송 중단)
-  const limitTimer = VIEW_LIMIT_SEC > 0
-    ? setTimeout(() => res.end(), VIEW_LIMIT_SEC * 1000)
+  const limit = viewLimitSec;
+  const limitTimer = limit > 0
+    ? setTimeout(() => res.end(), limit * 1000)
     : null;
   res.on('close', () => {
     clearTimeout(limitTimer);
@@ -394,7 +435,7 @@ app.get('/snapshot/:id', (req, res) => {
 app.listen(PORT, () => {
   console.log(`RTSP 뷰어: http://localhost:${PORT}`);
   console.log(`ffmpeg: ${FFMPEG}`);
-  console.log(`시청 시간 제한: ${VIEW_LIMIT_SEC > 0 ? `${VIEW_LIMIT_SEC}초` : '없음'}`);
+  console.log(`시청 시간 제한: ${describeLimit(viewLimitSec)}`);
 });
 
 function shutdown() {

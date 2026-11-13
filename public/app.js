@@ -186,12 +186,17 @@ try {
   if (saved) document.querySelector(`.layout-buttons button[data-cols="${saved}"]`)?.click();
 } catch {}
 
-(async () => {
+// 서버 설정(config.json) 변경을 새로고침 없이 반영. 보고 있는 화면은 다음 연결부터 적용
+async function loadSettings() {
   try {
     const r = await fetch('/api/settings');
     if (r.ok) viewLimitSec = (await r.json()).viewLimitSec;
   } catch {}
+}
+
+(async () => {
+  await loadSettings();
   refresh();
-  setInterval(refresh, 2000);
+  setInterval(() => { loadSettings(); refresh(); }, 2000);
   setInterval(() => tiles.forEach(renderBadge), 1000);
 })();
