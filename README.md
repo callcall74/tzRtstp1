@@ -17,6 +17,12 @@ npm start
 비밀번호를 바꾸려면 `config.json`의 `password`를 수정하고 서버를 다시 시작하세요 (기존 로그인은 모두 풀립니다).
 `ADMIN_PASSWORD` 환경 변수로 지정할 수도 있습니다.
 
+## 시청 시간 제한
+
+네트워크 사용량을 줄이기 위해 한 번 연결하면 30초 후 자동으로 끊깁니다 (서버에서 전송 중단).
+화면의 "다시 보기" 버튼을 누르면 다시 30초 동안 볼 수 있습니다.
+`config.json`에 `"viewLimitSec": 60`처럼 넣으면 시간을 바꿀 수 있고, `0`이면 제한이 없습니다.
+
 ## 외부에서 접속 (Cloudflare Tunnel)
 
 [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)를 설치한 뒤,

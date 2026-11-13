@@ -43,6 +43,8 @@ function loadConfig() {
   return cfg;
 }
 const config = loadConfig();
+// 한 번 연결로 볼 수 있는 시간 (네트워크 사용량 절약). config.json의 viewLimitSec로 변경, 0이면 무제한
+const VIEW_LIMIT_SEC = Number.isFinite(config.viewLimitSec) ? config.viewLimitSec : 30;
 
 // ---------- 카메라 목록 ----------
 function loadCameras() {
@@ -315,6 +317,10 @@ function publicCamera(cam) {
   };
 }
 
+app.get('/api/settings', (req, res) => {
+  res.json({ viewLimitSec: VIEW_LIMIT_SEC });
+});
+
 app.get('/api/cameras', (req, res) => {
   res.json(cameras.map(publicCamera));
 });
@@ -360,7 +366,14 @@ app.get('/stream/:id', (req, res) => {
   });
   const s = getStream(cam);
   s.addClient(res);
-  req.on('close', () => s.removeClient(res));
+  // 제한 시간이 지나면 서버에서 연결을 끊음 (클라이언트가 무시해도 전송 중단)
+  const limitTimer = VIEW_LIMIT_SEC > 0
+    ? setTimeout(() => res.end(), VIEW_LIMIT_SEC * 1000)
+    : null;
+  res.on('close', () => {
+    clearTimeout(limitTimer);
+    s.removeClient(res);
+  });
 });
 
 // 현재 프레임 스냅샷

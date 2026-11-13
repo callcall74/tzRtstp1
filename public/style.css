@@ -100,6 +100,9 @@ button:hover { border-color: var(--accent); }
   background: rgba(0, 0, 0, .55);
 }
 .overlay[hidden] { display: none; }
+.overlay { flex-direction: column; gap: 10px; }
+.btn-replay { background: var(--accent); border-color: var(--accent); }
+.badge.idle::before { content: "● "; color: var(--muted); }
 .badge {
   position: absolute;
   top: 8px;
