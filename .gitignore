@@ -1,0 +1,5 @@
+node_modules/
+# 카메라 비밀번호가 들어 있으므로 커밋하지 않음
+cameras.json
+.claude/
+개요/

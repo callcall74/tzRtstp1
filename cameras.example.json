@@ -1,0 +1,7 @@
+[
+  {
+    "id": "cam1",
+    "name": "카메라 1",
+    "url": "rtsp://user:password@host:554/path"
+  }
+]

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RTSP 뷰어</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>RTSP 뷰어</h1>
+    <div class="layout-buttons" role="group" aria-label="화면 분할">
+      <button data-cols="1">1</button>
+      <button data-cols="2" class="active">2</button>
+      <button data-cols="3">3</button>
+      <button data-cols="4">4</button>
+    </div>
+  </header>
+
+  <form id="add-form">
+    <input id="cam-name" placeholder="이름 (선택)" autocomplete="off">
+    <input id="cam-url" placeholder="rtsp://user:pass@host:554/path" required autocomplete="off">
+    <button type="submit">카메라 추가</button>
+    <span id="form-msg"></span>
+  </form>
+
+  <main id="grid" class="grid cols-2"></main>
+  <p id="empty" hidden>등록된 카메라가 없습니다. 위에서 RTSP 주소를 추가하세요.</p>
+
+  <template id="tile-tpl">
+    <section class="tile">
+      <div class="video">
+        <img alt="">
+        <div class="overlay">연결 중…</div>
+        <span class="badge"></span>
+      </div>
+      <div class="bar">
+        <div class="meta">
+          <strong class="name"></strong>
+          <small class="url"></small>
+        </div>
+        <div class="actions">
+          <button class="btn-reload" title="다시 연결">⟳</button>
+          <button class="btn-snap" title="스냅샷 저장">📷</button>
+          <button class="btn-full" title="전체 화면">⛶</button>
+          <button class="btn-del" title="삭제">✕</button>
+        </div>
+      </div>
+    </section>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
