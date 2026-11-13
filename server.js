@@ -44,7 +44,13 @@ function loadConfig() {
 }
 const config = loadConfig();
 // 한 번 연결로 볼 수 있는 시간 (네트워크 사용량 절약). config.json의 viewLimitSec로 변경, 0이면 무제한
-const VIEW_LIMIT_SEC = Number.isFinite(config.viewLimitSec) ? config.viewLimitSec : 30;
+// "60"처럼 문자열로 넣어도 숫자로 인식
+const VIEW_LIMIT_SEC = (() => {
+  const n = Number(config.viewLimitSec);
+  return config.viewLimitSec !== undefined && config.viewLimitSec !== '' && Number.isFinite(n) && n >= 0
+    ? n
+    : 30;
+})();
 
 // ---------- 카메라 목록 ----------
 function loadCameras() {
@@ -388,6 +394,7 @@ app.get('/snapshot/:id', (req, res) => {
 app.listen(PORT, () => {
   console.log(`RTSP 뷰어: http://localhost:${PORT}`);
   console.log(`ffmpeg: ${FFMPEG}`);
+  console.log(`시청 시간 제한: ${VIEW_LIMIT_SEC > 0 ? `${VIEW_LIMIT_SEC}초` : '없음'}`);
 });
 
 function shutdown() {
