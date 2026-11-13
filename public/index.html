@@ -9,11 +9,14 @@
 <body>
   <header>
     <h1>RTSP 뷰어</h1>
-    <div class="layout-buttons" role="group" aria-label="화면 분할">
-      <button data-cols="1">1</button>
-      <button data-cols="2" class="active">2</button>
-      <button data-cols="3">3</button>
-      <button data-cols="4">4</button>
+    <div class="header-right">
+      <div class="layout-buttons" role="group" aria-label="화면 분할">
+        <button data-cols="1">1</button>
+        <button data-cols="2" class="active">2</button>
+        <button data-cols="3">3</button>
+        <button data-cols="4">4</button>
+      </div>
+      <form method="post" action="/logout"><button type="submit">로그아웃</button></form>
     </div>
   </header>
 

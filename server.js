@@ -7,6 +7,8 @@ const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
 const CAMERAS_FILE = path.join(__dirname, 'cameras.json');
+const CONFIG_FILE = path.join(__dirname, 'config.json');
+const SESSION_MS = 7 * 24 * 60 * 60 * 1000; // 로그인 유지 7일
 const IDLE_STOP_MS = 10000; // 시청자가 없으면 10초 후 ffmpeg 종료
 const RESTART_DELAY_MS = 3000;
 
@@ -18,6 +20,29 @@ function resolveFfmpeg() {
   return require('ffmpeg-static');
 }
 const FFMPEG = resolveFfmpeg();
+
+// ---------- 설정 (로그인 비밀번호) ----------
+// config.json이 없으면 비밀번호와 세션 키를 생성해 저장. ADMIN_PASSWORD 환경 변수가 우선.
+function loadConfig() {
+  let cfg = {};
+  try {
+    cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+  } catch {}
+  let changed = false;
+  if (!cfg.password) {
+    cfg.password = crypto.randomBytes(6).toString('base64url');
+    changed = true;
+    console.log(`로그인 비밀번호가 생성되었습니다: ${cfg.password} (config.json에서 변경 가능)`);
+  }
+  if (!cfg.sessionSecret) {
+    cfg.sessionSecret = crypto.randomBytes(32).toString('hex');
+    changed = true;
+  }
+  if (changed) fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+  if (process.env.ADMIN_PASSWORD) cfg.password = process.env.ADMIN_PASSWORD;
+  return cfg;
+}
+const config = loadConfig();
 
 // ---------- 카메라 목록 ----------
 function loadCameras() {
@@ -197,9 +222,87 @@ function getStream(cam) {
   return s;
 }
 
+// ---------- 인증 ----------
+// 쿠키 값: "<만료시각>.<HMAC>" — 서버 재시작 후에도 유지되고, 비밀번호를 바꾸면 기존 세션은 무효
+function sign(expires) {
+  return crypto
+    .createHmac('sha256', config.sessionSecret)
+    .update(`${expires}:${config.password}`)
+    .digest('base64url');
+}
+function makeToken() {
+  const expires = Date.now() + SESSION_MS;
+  return `${expires}.${sign(expires)}`;
+}
+function verifyToken(token) {
+  const [expires, sig] = String(token || '').split('.');
+  if (!expires || !sig || Number(expires) < Date.now()) return false;
+  const expected = Buffer.from(sign(expires));
+  const given = Buffer.from(sig);
+  return expected.length === given.length && crypto.timingSafeEqual(expected, given);
+}
+function getCookie(req, name) {
+  const m = (req.headers.cookie || '').match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return m ? decodeURIComponent(m[1]) : '';
+}
+function isHttps(req) {
+  return req.secure || req.headers['x-forwarded-proto'] === 'https';
+}
+function clientIp(req) {
+  return req.headers['cf-connecting-ip'] || req.socket.remoteAddress;
+}
+
+// 로그인 시도 제한: IP당 10분에 10회
+const loginAttempts = new Map();
+function tooManyAttempts(ip) {
+  const now = Date.now();
+  const rec = loginAttempts.get(ip);
+  if (!rec || now - rec.first > 10 * 60 * 1000) {
+    loginAttempts.set(ip, { first: now, count: 1 });
+    return false;
+  }
+  rec.count++;
+  return rec.count > 10;
+}
+
 // ---------- HTTP ----------
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+app.post('/login', (req, res) => {
+  if (tooManyAttempts(clientIp(req))) {
+    return res.redirect('/login?error=locked');
+  }
+  const given = Buffer.from(String(req.body.password || ''));
+  const expected = Buffer.from(config.password);
+  if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
+    return res.redirect('/login?error=1');
+  }
+  loginAttempts.delete(clientIp(req));
+  const secure = isHttps(req) ? '; Secure' : '';
+  res.setHeader(
+    'Set-Cookie',
+    `sid=${makeToken()}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MS / 1000}${secure}`
+  );
+  res.redirect('/');
+});
+app.post('/logout', (req, res) => {
+  res.setHeader('Set-Cookie', 'sid=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+  res.redirect('/login');
+});
+app.get('/style.css', (req, res) => res.sendFile(path.join(__dirname, 'public', 'style.css')));
+
+// 이 아래 모든 경로는 로그인 필요
+app.use((req, res, next) => {
+  if (verifyToken(getCookie(req, 'sid'))) return next();
+  if (req.path === '/' || req.path.endsWith('.html')) return res.redirect('/login');
+  res.status(401).json({ error: '로그인이 필요합니다.' });
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 function publicCamera(cam) {

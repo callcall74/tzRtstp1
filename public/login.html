@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>로그인 - RTSP 뷰어</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="login-page">
+  <form class="login-box" method="post" action="/login">
+    <h1>RTSP 뷰어</h1>
+    <input type="password" name="password" placeholder="비밀번호" autofocus required autocomplete="current-password">
+    <button type="submit">로그인</button>
+    <p id="login-error" hidden></p>
+  </form>
+  <script>
+    const err = new URLSearchParams(location.search).get('error');
+    if (err) {
+      const p = document.getElementById('login-error');
+      p.textContent = err === 'locked'
+        ? '시도 횟수가 너무 많습니다. 10분 후 다시 시도하세요.'
+        : '비밀번호가 올바르지 않습니다.';
+      p.hidden = false;
+    }
+  </script>
+</body>
+</html>

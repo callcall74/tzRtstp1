@@ -134,3 +134,36 @@ button:hover { border-color: var(--accent); }
 .btn-del:hover { border-color: var(--err); }
 
 .video:fullscreen { aspect-ratio: auto; }
+
+.header-right { display: flex; align-items: center; gap: 12px; }
+.header-right form { margin: 0; }
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.login-box {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 24px;
+}
+.login-box h1 { margin: 0 0 8px; text-align: center; }
+.login-box input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 10px;
+  font: inherit;
+}
+.login-box button { background: var(--accent); border-color: var(--accent); padding: 9px; }
+#login-error { color: var(--err); font-size: 13px; margin: 0; }

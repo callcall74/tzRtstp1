@@ -78,7 +78,9 @@ function updateStatus(cam) {
 async function refresh() {
   let list;
   try {
-    list = await (await fetch('/api/cameras')).json();
+    const r = await fetch('/api/cameras');
+    if (r.status === 401) return location.replace('/login');
+    list = await r.json();
   } catch {
     return;
   }
